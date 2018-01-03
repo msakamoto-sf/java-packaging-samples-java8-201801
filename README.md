@@ -291,6 +291,7 @@ javaにPATHが通ったコマンドプロンプトまたはshellで、`bin/assem
 
 ## その他の参考資料
 
+"one-jar", "fat-jar":
 - One-JARでアプリケーションの配布を単純化
   - https://www.ibm.com/developerworks/jp/java/library/j-onejar/index.html
   - 依存するjarファイルを、jarのままアプリケーションjarの中に埋め込む。
@@ -302,8 +303,20 @@ javaにPATHが通ったコマンドプロンプトまたはshellで、`bin/assem
 - Fat Jar Eclipse Plug-In
   - http://fjep.sourceforge.net/
   - Eclipse から fat-jar を生成するプラグイン
+
+Spring Boot のjarパッケージングの仕組み：
+- Appendix E. The executable jar format
+  - https://docs.spring.io/spring-boot/docs/1.5.9.RELEASE/reference/html/executable-jar.html
+  - 仕組み的にはOne-JARとよく似ており、jarファイルをそのまま全体のjarの中に埋め込み、特殊なクラスローダを使ってbootstrapさせている。
+
+Jenkinsなど実行可能なwarファイルの作成についての調査メモ：
 - 参考メモ/Java Servletアプリで実行可能なwarの作り方の参考URLメモ - Qiita
   - https://qiita.com/msakamoto_sf/items/157c0266544ac012be89
 
-
+パッケージ関連のJava公式ガイド：
+- Java Platform, Standard Editionデプロイメント・ガイド, リリース8u40
+  - https://docs.oracle.com/javase/jp/8/docs/technotes/guides/deploy/
+  - JavaFXやアプレットなど、GUI向けの説明が多いが、ところどころ他のユースケースでも役に立つTIPSがあったりするので、時間がある時に一度ざっと眺めてみるのをおすすめする。
+  - 例えば「自己完結型アプリケーションのパッケージ化」ではJREを同梱した各OS向けのインストーラの生成方法が解説されており、業務アプリのデプロイ方式検討の参考になりそう。
+    - https://docs.oracle.com/javase/jp/8/docs/technotes/guides/deploy/self-contained-packaging.html
 
