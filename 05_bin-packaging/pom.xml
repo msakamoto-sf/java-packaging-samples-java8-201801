@@ -1,0 +1,113 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>samplepkg</groupId>
+  <artifactId>assembly-demo</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>assembly-demo</name>
+  <description>Bouncy Castle Demo</description>
+  <url>https://github.com/msakamoto-sf/java-packaging-samples-java8-201801</url>
+
+  <properties>
+    <!-- see : https://maven.apache.org/general.html#encoding-warning  -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <java.version.source>1.8</java.version.source>
+    <java.version.target>1.8</java.version.target>
+    <java.compiler.debug>true</java.compiler.debug>
+
+    <exec.mainClass>samplepkg.Demo</exec.mainClass>
+  </properties>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>23.6-jre</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk15on</artifactId>
+      <version>1.58</version>
+    </dependency>
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.12</version>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.6.1</version>
+        <configuration>
+          <source>${java.version.source}</source>
+          <target>${java.version.target}</target>
+          <encoding>${project.build.sourceEncoding}</encoding>
+          <debug>${java.compiler.debug}</debug>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>appassembler-maven-plugin</artifactId>
+        <version>1.10</version>
+        <configuration>
+          <!-- appassembler自身は依存jarは収集しない -->
+          <generateRepository>false</generateRepository>
+          <!-- assembly側のdependencySetで、"/lib" 以下に依存jarがflat構成で収集されるのに合わせる -->
+          <repositoryName>lib</repositoryName>
+          <repositoryLayout>flat</repositoryLayout>
+          <programs>
+            <program>
+              <mainClass>${exec.mainClass}</mainClass>
+              <id>assembly-demo-boot</id>
+            </program>
+          </programs>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>assemble</goal>
+             </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <descriptors>
+            <descriptor>src/assembly/bin.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id> <!-- this is used for inheritance merges -->
+            <phase>package</phase> <!-- bind to the packaging phase -->
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

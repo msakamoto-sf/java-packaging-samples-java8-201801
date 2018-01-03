@@ -136,11 +136,158 @@ Exception in thread "main" java.lang.SecurityException: Invalid signature file d
 
 - この他、Service Provider周りの設定が埋め込まれたjarファイルなどでもしかしたらuber-jarと相性の悪いケースがあるかもしれない。
 - そもそも上記pom.xmlに組み込んだ `<filters>` 要素の設定自体、署名が必要なjarファイルから署名情報をstripしているので、セキュリティを低下させている。
-- そのため、依存するjarファイルを「無加工で」パッケージングするのであれば、後述の Maven Assembly Plugin によるパッケージングや「その他の参考資料」に載せたOne-JARなどの技法を検討する必要がある。
+- そのため、依存するjarファイルを「無加工で」パッケージングするのであれば、次に紹介する Maven Application Assembler + Maven Assembly Plugin によるパッケージングや「その他の参考資料」に載せたOne-JARなどの技法を検討する必要がある。
 
+## 05. Maven Application Assembler と Maven Assembly Plugin によるラッパースクリプトの生成とパッケージング
 
+依存するjarファイルを加工せずにそのままパッケージングし、利用者が手軽にパッケージングする方法として、[Maven Application Assembler](http://www.mojohaus.org/appassembler/) と [Maven Assembly Plugin](http://maven.apache.org/plugins/maven-assembly-plugin/index.html) を組み合わせるやり方がある。
 
+- Maven Application Assembler
+  - http://www.mojohaus.org/appassembler/
+  - https://github.com/mojohaus/appassembler
+  - jarファイルのリストを抽出してclasspathに設定するラッパースクリプトを自動生成することができる。
+- Maven Assembly Plugin
+  - http://maven.apache.org/plugins/maven-assembly-plugin/
+  - 依存するjarファイルや必要なファイルをまとめてアーカイブすることができる。
 
+2つのプラグインを組み合わせることで、ラッパースクリプト + 依存jarファイル + その他設定・ドキュメントファイルなどを tar/zip 等にパッケージングすることができる。
+イメージとしてはTomcatやMavenの配布用binパッケージの内容と似た感じになり、ユーザとしては展開したのちコマンドプロンプトやshellからラッパースクリプトを起動するだけとなる。
+以下に `05_bin-packaging` のサンプルで試したポイントを紹介する。
+
+pom.xml で appassembler-maven-plugin を組み込む。
+`<configuration>` の `<program>` 要素設定で、id要素でラッパースクリプトのbasenameと実行クラス名を指定し、`<execution>` 要素で `package` フェーズで実行されるようにしている。
+```
+(...)
+  <build>
+    <plugins>
+(...)
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>appassembler-maven-plugin</artifactId>
+        <version>1.10</version>
+        <configuration>
+          <!-- appassembler自身は依存jarは収集しない -->
+          <generateRepository>false</generateRepository>
+          <!-- assembly側のdependencySetで、"/lib" 以下に依存jarがflat構成で収集されるのに合わせる -->
+          <repositoryName>lib</repositoryName>
+          <repositoryLayout>flat</repositoryLayout>
+          <programs>
+            <program>
+              <mainClass>${exec.mainClass}</mainClass>
+              <id>assembly-demo-boot</id>
+            </program>
+          </programs>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>assemble</goal>
+             </goals>
+          </execution>
+        </executions>
+      </plugin>
+(...)
+```
+
+これにより `package` フェーズを実行すると `target/appassembler/bin/` に以下のファイルが生成される。
+```
+assembly-demo-boot : Linux/Mac用shell script
+assembly-demo-boot.bat : Windows用BATファイル
+```
+
+これらのラッパースクリプトを `bin` フォルダに配置し、jarファイルを `lib` フォルダにまとめたフォルダツリーを zip や tar にまとめるのが Maven Assembly Plugin の役目となる。
+
+まず pom.xml の `<build>` - `<plugins>` に以下の設定を追加し、`package` フェーズで Maven Assembly Plugin の single ゴールが実行されるようにする。
+細かい設定は `src/assembly/bin.xml` で設定する。
+```
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <descriptors>
+            <descriptor>src/assembly/bin.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id> <!-- this is used for inheritance merges -->
+            <phase>package</phase> <!-- bind to the packaging phase -->
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+```
+
+今回のサンプルでは `src/assembly/bin.xml` を以下のように設定した。
+```
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.0.0 http://maven.apache.org/xsd/assembly-2.0.0.xsd">
+  <id>bin</id>
+  <formats>
+    <format>tar.gz</format>
+    <format>zip</format>
+  </formats>
+  <fileSets>
+    <!-- appassemblerにより生成されたbat/shは"/bin"以下に配置 -->
+    <fileSet>
+      <directory>target/appassembler/bin</directory>
+      <outputDirectory>bin</outputDirectory>
+    </fileSet>
+  </fileSets>
+  <dependencySets>
+    <dependencySet>
+      <outputDirectory>lib</outputDirectory>
+      <includes>
+        <include>*:jar:*</include>
+      </includes>
+    </dependencySet>
+  </dependencySets>
+</assembly>
+```
+
+実際にビルドしてみる。
+```
+cd 05_bin-packaging/
+./mvnw package
+-> target/ 以下に次のファイルが生成される。
+assembly-demo-1.0.0.jar
+assembly-demo-1.0.0-bin.tar.gz
+assembly-demo-1.0.0-bin.zip
+```
+
+試しに `assembly-demo-1.0.0-bin.zip` を展開してみると以下のようなファイルが展開される。
+```
+assembly-demo-1.0.0/
+  bin/
+    assembly-demo-boot
+    assembly-demo-boot.bat
+  lib/
+    animal-sniffer-annotations-1.14.jar
+    assembly-demo-1.0.0.jar
+    bcprov-jdk15on-1.58.jar
+    checker-compat-qual-2.0.0.jar
+    error_prone_annotations-2.1.3.jar
+    guava-23.6-jre.jar
+    j2objc-annotations-1.1.jar
+    jsr305-1.3.9.jar
+```
+
+javaにPATHが通ったコマンドプロンプトまたはshellで、`bin/assembly-demo-boot(.bat)` を実行すれば、アプリケーションが起動する。
+
+なお今回は `<program>` 要素を1つしか設定していないが、例えばサーバ用に `xxxx-startup` と `xxxx-shutdown` など2つ以上のそれぞれ別のメインクラスを起動するスクリプトを生成することもできる。
+これにより、Tomcatのようなサーバアプリケーションを、利用者がパッケージをダウンロードしたらすぐに使うことができる状態で配布する道が開ける。
+
+日本語参考記事
+- Maven でアプリケーション実行用バッチファイルを作る - A Memorandum
+  - http://etc9.hatenablog.com/entry/20101206/1291619754
+- Java/jarファイルの配布と実行方式
+  - https://www.glamenv-septzen.net/view/1121
+  - 手前味噌で記事も古くURLや設定が古かったりするが、考え方や大枠は流用できる。
+  - 実際に簡単なデーモンアプリケーションで起動用/停止用の複数のラッパースクリプトを生成するデモを紹介している。
 
 ## その他の参考資料
 
